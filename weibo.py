@@ -28,6 +28,7 @@ logging_path = os.path.split(
 logging.config.fileConfig(logging_path)
 logger = logging.getLogger('weibo')
 
+timeFormat = '%Y-%m-%d %H:%M'
 
 class Weibo(object):
     def __init__(self, config):
@@ -37,8 +38,8 @@ class Weibo(object):
             'filter']  # 取值范围为0、1,程序默认值为0,代表要爬取用户的全部微博,1代表只爬取用户的原创微博
         since_date = config['since_date']
         if isinstance(since_date, int):
-            since_date = date.today() - timedelta(since_date)
-        since_date = str(since_date)
+            since_date = datetime.now() - timedelta(minutes=since_date)
+        since_date = since_date.strftime(timeFormat)
         self.since_date = since_date  # 起始时间，即爬取发布日期从该值到现在的微博，形式为yyyy-mm-dd
         self.start_page = config.get('start_page',
                                      1)  # 开始爬的页，如果中途被限制而结束可以用此定义开始页码
@@ -102,7 +103,7 @@ class Weibo(object):
         since_date = config['since_date']
         if (not self.is_date(str(since_date))) and (not isinstance(
                 since_date, int)):
-            logger.warning(u'since_date值应为yyyy-mm-dd形式或整数,请重新输入')
+            logger.warning(u'since_date值应为yyyy-mm-dd HH:MM形式或整数,请重新输入')
             sys.exit()
 
         # 验证query_list
@@ -140,7 +141,7 @@ class Weibo(object):
     def is_date(self, since_date):
         """判断日期格式是否正确"""
         try:
-            datetime.strptime(since_date, '%Y-%m-%d')
+            datetime.strptime(since_date, timeFormat)
             return True
         except ValueError:
             return False
@@ -519,22 +520,22 @@ class Weibo(object):
     def standardize_date(self, created_at):
         """标准化微博发布时间"""
         if u'刚刚' in created_at:
-            created_at = datetime.now().strftime('%Y-%m-%d')
+            created_at = datetime.now().strftime(timeFormat)
         elif u'分钟' in created_at:
             minute = created_at[:created_at.find(u'分钟')]
             minute = timedelta(minutes=int(minute))
-            created_at = (datetime.now() - minute).strftime('%Y-%m-%d')
+            created_at = (datetime.now() - minute).strftime(timeFormat)
         elif u'小时' in created_at:
             hour = created_at[:created_at.find(u'小时')]
             hour = timedelta(hours=int(hour))
-            created_at = (datetime.now() - hour).strftime('%Y-%m-%d')
+            created_at = (datetime.now() - hour).strftime(timeFormat)
         elif u'昨天' in created_at:
             day = timedelta(days=1)
-            created_at = (datetime.now() - day).strftime('%Y-%m-%d')
+            created_at = (datetime.now() - day).strftime(timeFormat)
         else:
             created_at = created_at.replace('+0800 ', '')
             temp = datetime.strptime(created_at, '%c')
-            created_at = datetime.strftime(temp, '%Y-%m-%d')
+            created_at = datetime.strftime(temp, timeFormat)
         return created_at
 
     def standardize_info(self, weibo):
@@ -691,9 +692,9 @@ class Weibo(object):
                             if wb['id'] in self.weibo_id_list:
                                 continue
                             created_at = datetime.strptime(
-                                wb['created_at'], '%Y-%m-%d')
+                                wb['created_at'], timeFormat)
                             since_date = datetime.strptime(
-                                self.user_config['since_date'], '%Y-%m-%d')
+                                self.user_config['since_date'], timeFormat)
                             if created_at < since_date:
                                 if self.is_pinned_weibo(w):
                                     continue
@@ -1070,15 +1071,14 @@ class Weibo(object):
         try:
             self.get_user_info()
             self.print_user_info()
-            since_date = datetime.strptime(self.user_config['since_date'],
-                                           '%Y-%m-%d')
-            today = datetime.strptime(str(date.today()), '%Y-%m-%d')
+            since_date = datetime.strptime(self.user_config['since_date'], timeFormat)
+            today = datetime.now()
             if since_date <= today:
                 page_count = self.get_page_count()
                 wrote_count = 0
                 page1 = 0
                 random_pages = random.randint(1, 5)
-                self.start_date = datetime.now().strftime('%Y-%m-%d')
+                self.start_date = datetime.now().strftime(timeFormat)
                 pages = range(self.start_page, page_count + 1)
                 for page in tqdm(pages, desc='Progress'):
                     is_end = self.get_one_page(page)
@@ -1122,7 +1122,7 @@ class Weibo(object):
                         if self.is_date(info[2]):
                             user_config['since_date'] = info[2]
                         elif info[2].isdigit():
-                            since_date = date.today() - timedelta(int(info[2]))
+                            since_date = datetime.now() - timedelta(minutes=int(info[2]))
                             user_config['since_date'] = str(since_date)
                     else:
                         user_config['since_date'] = self.since_date
@@ -1180,7 +1180,7 @@ def get_config():
         sys.exit()
 
 
-def main():
+def run():
     try:
         config = get_config()
         wb = Weibo(config)
@@ -1190,4 +1190,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    run()
